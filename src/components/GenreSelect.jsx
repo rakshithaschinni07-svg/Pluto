@@ -1,4 +1,5 @@
 import { GENRES, GENRE_ORDER } from '../engine/genres.js';
+import { roundsWord } from '../engine/localEngine.js';
 import SceneArt from './SceneArt.jsx';
 import Tilt from './Tilt.jsx';
 
@@ -6,13 +7,13 @@ export default function GenreSelect({ onSelect, notice, onDismissNotice, replayC
   return (
     <section className="screen screen--genre">
       <header className="hero">
-        <p className="hero__eyebrow">Interactive fiction · four rounds · one ending</p>
+        <p className="hero__eyebrow">Interactive fiction · {roundsWord()} rounds · one ending</p>
         <h1 className="hero__title">
           <span className="hero__wordmark">PLUTO</span>
         </h1>
         <p className="hero__tagline">Choose your genre. Choose your fate.</p>
         <p className="hero__sub">
-          Four decisions. A twist you did not pick. An explorer profile built from how you actually chose —
+          {roundsWord({ capitalise: true })} decisions. A twist you did not pick. An explorer profile built from how you actually chose —
           not how you meant to.
         </p>
       </header>

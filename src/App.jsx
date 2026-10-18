@@ -7,6 +7,7 @@ import ProfileScreen from './components/ProfileScreen.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
 import StoryScreen from './components/StoryScreen.jsx';
 import { getGenre } from './engine/genres.js';
+import { roundsWord } from './engine/localEngine.js';
 import { useStory } from './hooks/useStory.js';
 
 const NEUTRAL_PALETTE = {
@@ -115,7 +116,7 @@ export default function App() {
             </span>
           )}
           {session.seed && session.phase !== 'genre' && (
-            <span className="topbar__seed" title="This run’s seed — the same seed would replay the same story">
+            <span className="topbar__seed" title="This run’s seed code — it shows up on your ending card">
               seed {session.seed.code}
             </span>
           )}
@@ -139,6 +140,14 @@ export default function App() {
       </header>
 
       <main className="stage">
+        {session.error && session.phase !== 'genre' && (
+          <div className="banner banner--notice" role="alert">
+            <span>{session.error}</span>
+            <button type="button" className="btn btn--small" onClick={replay}>
+              Start over
+            </button>
+          </div>
+        )}
         <div className="screen-swap" key={screenKey}>
           {session.phase === 'genre' && (
             <GenreSelect
@@ -162,7 +171,7 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <span>Pluto · four decisions · one twist · no accounts, no camera, no microphone</span>
+        <span>Pluto · {roundsWord()} decisions · one twist · no accounts, no camera, no microphone</span>
         <span className="footer__hint">Tip: tap the scene text to skip the typewriter · press 1–3 to pick an option</span>
       </footer>
 

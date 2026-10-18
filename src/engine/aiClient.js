@@ -82,7 +82,7 @@ function buildScenePrompt({ genreId, seed, round, totalRounds, history = [], ten
   const recent = history.slice(-3).map((entry, i) => {
     const last = entry.tagsAtChoice || {};
     return [
-      `Round ${history.length - Math.min(3, history.length) + i}: ${entry.sceneText}`,
+      `Round ${history.length - Math.min(3, history.length) + i + 1}: ${entry.sceneText}`,
       `Player chose: "${entry.choiceMade}" (tension ${last.tensionDelta >= 0 ? '+' : ''}${last.tensionDelta ?? 0}${last.clue ? `, clue: ${last.clue}` : ''}${last.ally ? `, ally: ${last.ally}` : ''})`,
     ].join('\n');
   });
@@ -202,57 +202,91 @@ export function normaliseEnding(raw) {
 }
 
 /**
+ * Some OpenAI-compatible servers (and newer OpenAI models) reject parameters we send by
+ * default. When a 400 names one of them, drop or rename it and retry the same request, so
+ * a provider quirk does not silently push every round into the scripted fallback.
+ * Returns true if something was changed (i.e. a retry is worthwhile).
+ */
+function adaptParams(params, detail) {
+  const msg = String(detail).toLowerCase();
+  if (params.tokenKey === 'max_tokens' && msg.includes('max_completion_tokens')) {
+    params.tokenKey = 'max_completion_tokens';
+    return true;
+  }
+  if (params.temperature !== null && msg.includes('temperature')) {
+    params.temperature = null;
+    return true;
+  }
+  if (params.jsonMode && msg.includes('response_format')) {
+    params.jsonMode = false;
+    return true;
+  }
+  return false;
+}
+
+/**
  * One AI request. Throws on failure so the caller can decide about retries.
  * Aborts internally at AI_TIMEOUT_MS so a hung request cannot stall the demo.
+ * Cancellation (the caller's signal) always surfaces as Error('cancelled'), and a
+ * timeout as a normal Error, so callers can tell the two apart reliably.
  */
 async function callModel({ config, system, user, signal = null, maxTokens = 900 }) {
+  if (signal?.aborted) throw new Error('cancelled');
+
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort('timeout'), AI_TIMEOUT_MS);
-  const onOuterAbort = () => controller.abort('cancelled');
-  if (signal) {
-    if (signal.aborted) {
-      clearTimeout(timer);
-      throw new Error('cancelled');
-    }
-    signal.addEventListener('abort', onOuterAbort, { once: true });
-  }
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, AI_TIMEOUT_MS);
+  const onOuterAbort = () => controller.abort();
+  signal?.addEventListener('abort', onOuterAbort, { once: true });
+
+  const params = { temperature: 0.95, tokenKey: 'max_tokens', jsonMode: true };
 
   try {
-    const response = await fetch(config.baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify({
+    for (let pass = 0; pass <= 3; pass += 1) {
+      const body = {
         model: config.model,
-        temperature: 0.95,
-        max_tokens: maxTokens,
-        response_format: { type: 'json_object' },
+        [params.tokenKey]: maxTokens,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
-      }),
-      signal: controller.signal,
-    });
+      };
+      if (params.temperature !== null) body.temperature = params.temperature;
+      if (params.jsonMode) body.response_format = { type: 'json_object' };
 
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      throw new Error(`AI HTTP ${response.status}${detail ? `: ${detail.slice(0, 180)}` : ''}`);
+      const response = await fetch(config.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        if (response.status === 400 && pass < 3 && adaptParams(params, detail)) continue;
+        throw new Error(`AI HTTP ${response.status}${detail ? `: ${detail.slice(0, 180)}` : ''}`);
+      }
+
+      const payload = await response.json();
+      const content = payload?.choices?.[0]?.message?.content ?? payload?.choices?.[0]?.text ?? '';
+      const json = extractJson(content);
+      if (!json) throw new Error('AI returned unparseable output');
+      return json;
     }
-
-    const payload = await response.json();
-    const content =
-      payload?.choices?.[0]?.message?.content ??
-      payload?.choices?.[0]?.text ??
-      '';
-    const json = extractJson(content);
-    if (!json) throw new Error('AI returned unparseable output');
-    return json;
+    throw new Error('AI request was rejected by the provider');
+  } catch (error) {
+    if (signal?.aborted) throw new Error('cancelled');
+    if (timedOut) throw new Error(`AI request timed out after ${AI_TIMEOUT_MS / 1000}s`);
+    throw error;
   } finally {
     clearTimeout(timer);
-    if (signal) signal.removeEventListener('abort', onOuterAbort);
+    signal?.removeEventListener('abort', onOuterAbort);
   }
 }
 
@@ -315,7 +349,7 @@ export async function testConnection(config) {
     user: 'Reply with exactly {"ok": true}.',
     maxTokens: 20,
   });
-  return Boolean(raw?.ok ?? raw);
+  return raw?.ok === true;
 }
 
 export const GENRE_IDS = GENRE_ORDER;

@@ -34,6 +34,7 @@ export default function StoryScreen({ session, onChoose, onFreeText }) {
     const onKey = (event) => {
       const tag = event.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
       const index = Number(event.key) - 1;
       const option = current.options[index];
       if (option) onChoose(option);

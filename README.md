@@ -127,8 +127,7 @@ network tab. Mitigations in place for v1:
 
 `Test` in the Session panel verifies the endpoint answers with the expected JSON shape.
 
-Set `VITE_...` nothing — there is deliberately no build-time key, so a build can never
-leak one.
+There is deliberately no build-time key (no `VITE_*` variable), so a build can never leak one.
 
 ---
 

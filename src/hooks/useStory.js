@@ -235,6 +235,8 @@ export function useStory() {
   const chooseOption = useCallback(
     async (option) => {
       if (!option?.tags) return;
+      // A double-tap, or a key press plus a click, must not commit two decisions.
+      if (sessionRef.current.pending || sessionRef.current.phase !== 'playing') return;
       const signal = startAbort().signal;
       const snapshot = sessionRef.current;
       const round = snapshot.round;

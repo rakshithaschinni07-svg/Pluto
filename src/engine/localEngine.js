@@ -14,6 +14,14 @@ export const TOTAL_ROUNDS = 4;
 
 export const ROUND_LABELS = ['Arrival', 'Friction', 'Reveal', 'The Choice'];
 
+const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+
+/** TOTAL_ROUNDS as a word ("four"), so UI copy follows the constant if it changes to 3. */
+export function roundsWord({ capitalise = false } = {}) {
+  const word = NUMBER_WORDS[TOTAL_ROUNDS] ?? String(TOTAL_ROUNDS);
+  return capitalise ? word.charAt(0).toUpperCase() + word.slice(1) : word;
+}
+
 /** Option archetypes. Each pushes a different axis so every round has real texture. */
 const OPTION_ARCHETYPES = [
   {
@@ -268,16 +276,18 @@ function truncate(str, n) {
 export function classifyFreeText(text) {
   const t = String(text).toLowerCase();
   const rng = createRng('free', t);
-  if (/(wait|hold|hide|careful|quiet|watch|listen)/.test(t)) {
+  // Whole-word matching: a bare substring test made "go" match "good" and "ask" match "task".
+  const has = (words) => new RegExp(`\\b(?:${words})\\b`).test(t);
+  if (has('wait|hold|hide|careful|carefully|quiet|quietly|watch|listen')) {
     return optionFromArchetype('wary', text, rng);
   }
-  if (/(ask|why|how|find|search|look|investigate|check)/.test(t)) {
+  if (has('ask|why|how|find|search|look|investigate|check')) {
     return optionFromArchetype('curious', text, rng);
   }
-  if (/(tell|trust|help|together|speak|convince|ally)/.test(t)) {
+  if (has('tell|trust|help|together|speak|convince|ally')) {
     return optionFromArchetype('social', text, rng);
   }
-  if (/(decide|choose|now|commit|end it|go|move)/.test(t)) {
+  if (has('decide|choose|now|commit|end it|go|move')) {
     return optionFromArchetype('commit', text, rng);
   }
   return optionFromArchetype('bold', text, rng);
@@ -289,9 +299,10 @@ function optionFromArchetype(key, text, rng) {
     id: `free-${key}`,
     text: text.trim(),
     tags: {
-      tensionDelta: archetype.tags.tensionDelta,    clue: null,
-    ally: null,
-    profileAxis: { bold_cautious: 0, lone_social: 0, curious_decisive: 0, ...archetype.tags.profileAxis },
+      tensionDelta: archetype.tags.tensionDelta,
+      clue: null,
+      ally: null,
+      profileAxis: { bold_cautious: 0, lone_social: 0, curious_decisive: 0, ...archetype.tags.profileAxis },
     },
     tone: key === 'social' ? 'social' : key,
     freeText: true,

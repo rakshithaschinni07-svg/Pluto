@@ -18,6 +18,15 @@ export default function SettingsPanel({ open, onClose, config, onSave, session, 
     }
   }, [open, config]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const handleTest = async () => {

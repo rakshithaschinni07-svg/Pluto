@@ -19,6 +19,12 @@ export default function Typewriter({ text = '', speed = BASE_SPEED, onComplete, 
     setSkipped(false);
     setCount(0);
 
+    // Reduced-motion users get the full text at once instead of a character-by-character reveal.
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setCount(text.length);
+      return undefined;
+    }
+
     // Longer scenes type at a slightly quicker cadence so nothing drags.
     const pace = text.length > 620 ? speed * 0.65 : speed;
     let i = 0;
