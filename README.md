@@ -7,6 +7,10 @@ no account, no database, no server.
 
 Built to the six-document spec (PRD · TRD · App Flow · UI/UX · Schema · Implementation Plan).
 
+## 🚀 Live Demo
+
+[Click here to visit the live website](https://pluto-ai-1.onrender.com)
+
 ---
 
 ## Run it
