@@ -10,7 +10,7 @@ import { ROUND_LABELS, tensionTier } from '../engine/localEngine.js';
 const ACT_NUMERALS = ['I', 'II', 'III', 'IV'];
 
 export default function StoryScreen({ session, onChoose, onFreeText }) {
-  const { current, pending, round, totalRounds, tension, clues, allies, genreId, lastTone = 'arrival' } = session;
+  const { current, pending, round, totalRounds, tension, clues, allies, genreId, history = [], lastTone = 'arrival' } = session;
   const [textDone, setTextDone] = useState(false);
   const [freeTextOpen, setFreeTextOpen] = useState(false);
   const [freeText, setFreeText] = useState('');
@@ -81,6 +81,14 @@ export default function StoryScreen({ session, onChoose, onFreeText }) {
         </div>
         <div className="art-frame__scrim" />
         <div className="art-frame__sweep" key={`sweep-${round}-${lastTone}`} />
+        {lastTone !== 'arrival' && (
+          <>
+            <div className="art-frame__flash" data-mood={lastTone} key={`flash-${round}-${lastTone}`} />
+            <div className="art-frame__stamp" key={`stamp-${round}-${lastTone}`} aria-hidden="true">
+              {grade.label}
+            </div>
+          </>
+        )}
         <div className="art-frame__caption">
           <span className="art-frame__act">Act {ACT_NUMERALS[Math.min(round, ACT_NUMERALS.length - 1)]}</span>
           <span className="art-frame__place">{beatLabel}</span>
@@ -92,6 +100,18 @@ export default function StoryScreen({ session, onChoose, onFreeText }) {
           )}
         </div>
       </Tilt>
+
+      {history.length > 0 && (
+        <div className="trail" aria-label="Your decisions so far">
+          <span>Your path</span>
+          {history.map((h, i) => (
+            <span key={`${h.round}-${i}`} style={{ display: 'contents' }}>
+              {i > 0 && <span className="trail__arrow">→</span>}
+              <span className="trail__step">{moodGrade(h.tone).label}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="story-body">
         {showSkeleton ? (

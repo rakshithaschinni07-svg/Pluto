@@ -21,15 +21,12 @@ const NEUTRAL_PALETTE = {
 export default function App() {
   const {
     session,
-    aiConfig,
-    aiEnabled,
     startRun,
     chooseOption,
     submitFreeText,
     goToProfile,
     replay,
     dismissNotice,
-    updateAiConfig,
   } = useStory();
 
   const rootRef = useRef(null);
@@ -120,14 +117,6 @@ export default function App() {
               seed {session.seed.code}
             </span>
           )}
-          <span className={`engine-dot engine-dot--${session.usingFallback ? 'fallback' : aiEnabled ? 'ai' : 'local'}`} title={
-            session.usingFallback ? 'Scripted path' : aiEnabled ? 'Live AI' : 'Local engine'
-          }>
-            <span className="engine-dot__pip" />
-            {/* Deliberately neutral label — the pip colour tells the presenter what they
-                need to know without the room reading "fallback" over their shoulder. */}
-            <span className="engine-dot__text">engine</span>
-          </span>
           <button
             type="button"
             className="topbar__settings"
@@ -175,14 +164,7 @@ export default function App() {
         <span className="footer__hint">Tip: tap the scene text to skip the typewriter · press 1–3 to pick an option</span>
       </footer>
 
-      <SettingsPanel
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        config={aiConfig}
-        onSave={updateAiConfig}
-        session={session}
-        aiEnabled={aiEnabled}
-      />
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} session={session} />
     </div>
   );
 }

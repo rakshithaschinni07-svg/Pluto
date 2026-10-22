@@ -424,8 +424,8 @@ button {
   transform: scale(calc((1.03 + var(--act, 0) * 0.13) * var(--zoom, 1)))
     translate(var(--pan-x, 0), calc(var(--pan-y, 0) + var(--act, 0) * -10px));
   transition: transform 1.25s cubic-bezier(0.16, 1, 0.3, 1), filter 0.9s ease;
-  filter: saturate(calc(var(--sat, 1) * (1 + var(--intensity, 0) * 0.28))) brightness(var(--bright, 1))
-    contrast(calc(var(--contrast, 1) + var(--intensity, 0) * 0.06));
+  filter: hue-rotate(var(--hue, 0deg)) saturate(calc(var(--sat, 1) * (1 + var(--intensity, 0) * 0.28)))
+    brightness(var(--bright, 1)) contrast(calc(var(--contrast, 1) + var(--intensity, 0) * 0.06));
 }
 
 /* A single light sweep plays whenever the stance changes, so the shift is unmissable. */
@@ -1913,4 +1913,73 @@ button {
   .tilt {
     transform: none !important;
   }
+}
+
+
+/* ── Decision feedback: a colour flash + a big stance stamp, then a trail of past choices ── */
+.art-frame__flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 50%, var(--flash, #fff) 0%, transparent 70%);
+  animation: choiceFlash 0.9s ease-out both;
+}
+.art-frame__flash[data-mood='bold'] { --flash: #ff5a2e; }
+.art-frame__flash[data-mood='wary'] { --flash: #3f6bff; }
+.art-frame__flash[data-mood='curious'] { --flash: #ffd23f; }
+.art-frame__flash[data-mood='social'] { --flash: #ff7ac8; }
+.art-frame__flash[data-mood='commit'] { --flash: #ffffff; }
+
+.art-frame__stamp {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  font-weight: 800;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  font-size: clamp(1.4rem, 4.6vw, 2.8rem);
+  color: #fff;
+  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.7);
+  opacity: 0;
+  animation: stampIn 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -10px 0 18px;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #9a9aa8);
+}
+.trail__step {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: var(--tint);
+  animation: fadeSwap 0.6s ease both;
+}
+.trail__arrow { opacity: 0.5; }
+
+@keyframes choiceFlash {
+  0% { opacity: 0.85; transform: scale(0.6); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+@keyframes stampIn {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -58%) scale(0.98); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .art-frame__flash,
+  .art-frame__stamp { animation: none; opacity: 0; }
 }

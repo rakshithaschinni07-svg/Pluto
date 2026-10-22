@@ -3,20 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GENRES } from '../engine/genres.js';
 import { generateSeed } from '../engine/seed.js';
 import { TOTAL_ROUNDS, ROUND_LABELS, localScene, localEnding, classifyFreeText } from '../engine/localEngine.js';
-import { getScript } from '../engine/scripts.js';
 import { applyAxes, deriveProfile } from '../engine/profile.js';
 import { deriveTone } from '../engine/artMood.js';
-import {
-  AI_TIMEOUT_MS,
-  isAiConfigured,
-  loadAiConfig,
-  requestScene,
-  requestEnding,
-  saveAiConfig,
-} from '../engine/aiClient.js';
 
 /**
- * Simulated thinking time for the local + scripted paths. Keeps the shimmer UI honest
+ * Simulated thinking time for the local engine. Keeps the shimmer UI honest
  * and stops the demo from feeling like a static page, without adding real dead air.
  */
 const LOCAL_LATENCY = [420, 900];
@@ -58,7 +49,7 @@ export function initialSession() {
     pending: false,
     generating: false,
     usingFallback: false,
-    mode: 'local', // local | ai | fallback
+    mode: 'local',
     status: '',
     ending: null,
     profile: null,
@@ -71,7 +62,6 @@ export function initialSession() {
 export function useStory() {
   const sessionRef = useRef(initialSession());
   const [session, setSession] = useState(sessionRef.current);
-  const [aiConfig, setAiConfig] = useState(() => loadAiConfig());
   const abortRef = useRef(null);
 
   const commit = useCallback((patch) => {
@@ -90,92 +80,19 @@ export function useStory() {
     return controller;
   }, []);
 
-  /**
-   * Generate one round, applying the TRD failure policy:
-   * no key -> local engine; key -> try (1 retry) and silently drop into the
-   * scripted path if both attempts fail. Never throws at the caller.
-   */
-  const generateScene = useCallback(
-    async (snapshot, round, signal) => {
-      const { genreId, seed, tension, clues, allies, axes, usingFallback } = snapshot;
+  /** Generate one round with the local seeded engine. Never throws at the caller. */
+  const generateScene = useCallback(async (snapshot, round, signal) => {
+    const { genreId, seed, tension, clues, allies } = snapshot;
+    await sleep(LOCAL_LATENCY[0] + Math.random() * (LOCAL_LATENCY[1] - LOCAL_LATENCY[0]), signal);
+    return { data: localScene({ genreId, seed, round, tension, clues, allies }), mode: 'local', usingFallback: false };
+  }, []);
 
-      const scripted = () => {
-        const script = getScript(genreId);
-        const beat = script.beats[Math.min(round, script.beats.length - 1)];
-        return { sceneText: beat.sceneText, options: beat.options, source: 'fallback' };
-      };
-
-      if (usingFallback) {
-        await sleep(LOCAL_LATENCY[0] + Math.random() * (LOCAL_LATENCY[1] - LOCAL_LATENCY[0]), signal);
-        return { data: scripted(), mode: 'fallback', usingFallback: true };
-      }
-
-      if (!isAiConfigured(aiConfig)) {
-        await sleep(LOCAL_LATENCY[0] + Math.random() * (LOCAL_LATENCY[1] - LOCAL_LATENCY[0]), signal);
-        return { data: localScene({ genreId, seed, round, tension, clues, allies }), mode: 'local', usingFallback: false };
-      }
-
-      try {
-        const data = await requestScene({
-          config: aiConfig,
-          genreId,
-          seed,
-          round,
-          totalRounds: snapshot.totalRounds,
-          roundLabel: ROUND_LABELS[Math.min(round, ROUND_LABELS.length - 1)],
-          history: snapshot.history,
-          tension,
-          clues,
-          allies,
-          axes,
-          signal,
-          onAttempt: (kind) => kind === 'retry' && commit((s) => ({ ...s, status: 'Steadying the signal…' })),
-        });
-        return { data, mode: 'ai', usingFallback: false };
-      } catch (error) {
-        if (error?.message === 'cancelled') throw error;
-        // Silent downgrade — the room never sees an error.
-        await sleep(LOCAL_LATENCY[0], signal);
-        return { data: scripted(), mode: 'fallback', usingFallback: true };
-      }
-    },
-    [aiConfig, commit],
-  );
-
-  const generateEnding = useCallback(
-    async (snapshot, signal) => {
-      const { genreId, seed, tension, clues, allies, axes, usingFallback, history } = snapshot;
-      const choices = history.map((h) => h.choiceMade);
-
-      const scriptedEnding = () => ({ ...getScript(genreId).ending, source: 'fallback' });
-
-      if (usingFallback || !isAiConfigured(aiConfig)) {
-        await sleep(LOCAL_LATENCY[0], signal);
-        return usingFallback
-          ? scriptedEnding()
-          : localEnding({ genreId, seed, clues, allies, tension, choices });
-      }
-
-      try {
-        return await requestEnding({
-          config: aiConfig,
-          genreId,
-          seed,
-          history,
-          tension,
-          clues,
-          allies,
-          axes,
-          signal,
-        });
-      } catch (error) {
-        if (error?.message === 'cancelled') throw error;
-        await sleep(LOCAL_LATENCY[0], signal);
-        return { ...scriptedEnding(), source: 'fallback' };
-      }
-    },
-    [aiConfig],
-  );
+  const generateEnding = useCallback(async (snapshot, signal) => {
+    const { genreId, seed, tension, clues, allies, history } = snapshot;
+    const choices = history.map((h) => h.choiceMade);
+    await sleep(LOCAL_LATENCY[0], signal);
+    return localEnding({ genreId, seed, clues, allies, tension, choices });
+  }, []);
 
   const buildProfile = useCallback((snapshot, ending) => {
     return deriveProfile(snapshot.axes, {
@@ -301,8 +218,7 @@ export function useStory() {
             profile,
             pending: false,
             generating: false,
-            mode: ending.source === 'ai' ? 'ai' : sessionRef.current.usingFallback ? 'fallback' : 'local',
-            usingFallback: sessionRef.current.usingFallback || ending.source === 'fallback',
+            mode: 'local',
           }));
         } else if (pendingScene) {
           const { data, mode, usingFallback } = await pendingScene;
@@ -325,7 +241,7 @@ export function useStory() {
     [buildProfile, commit, generateEnding, generateScene, startAbort],
   );
 
-  /** Absorb a free-text "something else" answer. Works even with no AI available. */
+  /** Absorb a free-text "something else" answer.  */
   const submitFreeText = useCallback(
     async (text) => {
       const trimmed = String(text || '').trim();
@@ -351,38 +267,24 @@ export function useStory() {
 
   const dismissNotice = useCallback(() => commit({ notice: null }), [commit]);
 
-  const updateAiConfig = useCallback(
-    (config) => {
-      saveAiConfig(config);
-      setAiConfig(config);
-    },
-    [],
-  );
-
   const value = useMemo(
     () => ({
       session,
-      aiConfig,
-      aiEnabled: isAiConfigured(aiConfig),
-      aiTimeout: AI_TIMEOUT_MS,
       startRun,
       chooseOption,
       submitFreeText,
       goToProfile,
       replay,
       dismissNotice,
-      updateAiConfig,
     }),
     [
       session,
-      aiConfig,
       startRun,
       chooseOption,
       submitFreeText,
       goToProfile,
       replay,
       dismissNotice,
-      updateAiConfig,
     ],
   );
 

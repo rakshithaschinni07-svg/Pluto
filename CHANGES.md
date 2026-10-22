@@ -1,3 +1,11 @@
+# Latest changes
+
+- **API removed.** No AI client, key, endpoint or scripted fallback — Pluto is fully offline on the local seeded engine. The Session panel now only shows run info.
+- **Shorter lore.** Scenes are ~35–50 words (were 80–120); the opener is a single beat; endings are ~40 words. Faster rounds for tight team slots.
+- **Choices change the picture, loudly.** Stronger camera/colour grade per stance (incl. hue shift), a colour flash + big stance stamp when you choose, and a "Your path" trail of past decisions.
+
+---
+
 # Changes in this version
 
 ## Bug fixes

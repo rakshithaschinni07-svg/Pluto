@@ -1,8 +1,7 @@
 /**
  * Local story engine.
  *
- * This is Pluto's always-available generator. It runs when no API key is configured,
- * and it is what the AI adapter mirrors when it is working. Because it is seeded,
+ * This is Pluto's only generator — everything runs locally in the browser. Because it is seeded,
  * three consecutive runs of the same genre produce materially different openings —
  * the Phase 8 replayability test — without any network call.
  */
@@ -164,13 +163,11 @@ export function localScene({ genreId, seed, round, tension = 0, clues = [], alli
 
   const beats = genre.beats[Math.min(round, genre.beats.length - 1)];
   const beat = fill(rng.pick(beats), slots);
-  const mood = fill(rng.pick(genre.mood), slots);
-  // Threads weave in the run's second location, second figure and second artefact, so
-  // the middle of the story opens out instead of restating the same pressure.
-  const threads = rng.sample(genre.threads, round >= 1 ? 2 : 1).map((line) => fill(line, slots));
-  const closer = round === 0 ? '' : fill(rng.pick(genre.stakesLines), slots);
+  // Keep lore short: one beat, plus a single stakes line after the opener. Teams have a tight window, so we favour brevity.
+  // The opener is the beat alone: players should be choosing within seconds.
+  const support = round === 0 ? '' : fill(rng.pick(genre.stakesLines), slots);
 
-  const sceneText = sentenceCase([beat, ...threads, mood, closer].filter(Boolean).join(' '));
+  const sceneText = sentenceCase([beat, support].filter(Boolean).join(' '));
 
   // Pick three distinct archetypes; the final round always includes a bold line so the
   // last decision feels like one.
@@ -230,25 +227,10 @@ export function localEnding({ genreId, seed, clues = [], allies = [], tension = 
     : 'You never did find the piece that would have made it simple.';
   const lastChoice = choices.length ? choices[choices.length - 1] : null;
   const choiceLine = lastChoice
-    ? `Your last decision — “${truncate(lastChoice, 90)}” — is the one that will be remembered here, and misremembered later.`
+    ? `Your last move — “${truncate(lastChoice, 60)}” — is the one they will remember.`
     : '';
 
-  const text = sentenceCase([
-    `${fill(rng.pick(genre.beats[genre.beats.length - 1]), {
-      place: ctx.place,
-      figure: ctx.figure,
-      object: ctx.object,
-      stake: ctx.stakes[1],
-      pressure: ctx.pressure,
-      sensation: ctx.sensation,
-    })}`,
-    clueLine,
-    allyLine,
-    `The tension of the whole affair sits at ${tier.label.toLowerCase()} — ${tier.note.toLowerCase()}`,
-    choiceLine,
-  ]
-    .filter(Boolean)
-    .join(' '));
+  const text = sentenceCase([clueLine, allyLine, choiceLine].filter(Boolean).join(' '));
 
   return {
     title: ctx.endingTitle,
